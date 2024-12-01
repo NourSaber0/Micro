@@ -25,5 +25,9 @@ public class ReservationStation {
 		resultValue = null;
 		executionStartCycle = executionEndCycle = 0;
 	}
+
+	public String toString() {
+		return tag + " " + operation + " " + Vj + " " + Vk + " " + Qj + " " + Qk + " " + resultValue + " " + executionStartCycle + " " + executionEndCycle + " " + busy;
+	}
 }
 

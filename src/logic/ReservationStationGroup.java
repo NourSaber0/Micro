@@ -9,7 +9,7 @@ public class ReservationStationGroup {
 		this.operation = operation;
 		stations = new ReservationStation[size];
 		for (int i = 0; i < size; i++) {
-			stations[i] = new ReservationStation("RS" + i);
+			stations[i] = new ReservationStation(operation.name() + i);
 		}
 	}
 }

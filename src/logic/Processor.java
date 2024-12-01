@@ -1,4 +1,5 @@
 package logic;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -7,13 +8,18 @@ import java.util.Map;
 import static logic.InstructionType.getLatency;
 
 public class Processor {
-	private List<Instruction> instructionQueue = new ArrayList<>();
-	private List<ReservationStationGroup> reservationStations = new ArrayList<>();
-	public RegisterFile registerFile = new RegisterFile(32); // Example: 32 registers
-	private CommonDataBus cdb = new CommonDataBus();
-	private Cache dataCache;
-	private Map<Integer, String> memory = new HashMap<>(); // Simulated main memory
-	private int cycle = 0;
+	private final List<Instruction> instructionQueue = new ArrayList<>();
+	private final List<ReservationStationGroup> reservationStations;
+	private final RegisterFile registerFile = new RegisterFile(32); // Example: 32 registers
+	private final CommonDataBus cdb = new CommonDataBus();
+	private final Cache dataCache;
+	private final Map<Integer, String> memory = new HashMap<>(); // Simulated main memory
+	private int cycle = 1;
+
+	public Processor(List<ReservationStationGroup> reservationStations, Cache dataCache) {
+		this.reservationStations = reservationStations;
+		this.dataCache = dataCache;
+	}
 
 	public void addInstruction(Instruction instruction) {
 		instructionQueue.add(instruction);
@@ -34,7 +40,7 @@ public class Processor {
 
 	private void issueStage() {
 		if (instructionQueue.isEmpty()) return;
-		Instruction instruction = instructionQueue.get(0);
+		Instruction instruction = instructionQueue.getFirst();
 		ReservationStation station = getFreeStation(instruction.operation);
 		if (station == null) {
 			System.out.println("No free reservation station for operation: " + instruction.operation);
@@ -47,6 +53,7 @@ public class Processor {
 
 		// Fetch and validate source registers
 		try {
+
 			Register src1 = registerFile.getRegister(Integer.parseInt(instruction.src1.substring(1)));
 			Register src2 = registerFile.getRegister(Integer.parseInt(instruction.src2.substring(1)));
 
@@ -67,13 +74,12 @@ public class Processor {
 			// Update destination register
 			Register dest = registerFile.getRegister(Integer.parseInt(instruction.dest.substring(1)));
 			dest.setTag(station.tag);
-			dest.setReady(false);
 
 			// Update instruction metadata
 			instruction.issueCycle = cycle;
 
 			// Remove instruction from the queue
-			instructionQueue.remove(0);
+			instructionQueue.removeFirst();
 
 			System.out.println("Instruction issued: " + instruction);
 
@@ -82,34 +88,65 @@ public class Processor {
 		}
 	}
 
-	private void checkBus(ReservationStation station) {
-		if (cdb.tag.equals(station.Qj)) {
-			station.Vj = cdb.value;
-			station.Qj = "0";
-		}
-		if (cdb.tag.equals(station.Qk)) {
-			station.Vk = cdb.value;
-			station.Qk = "0";
-		}
-	}
-	private void checkBusRegisterFile() {
-		for (Register register : registerFile.registers) {
-			if (cdb.tag.equals(register.tag)) {
-				register.setValue(cdb.value);
-				register.setReady(true);
-				register.setTag("0");
+	private void checkBusReservationStations() {
+		for (ReservationStationGroup group : reservationStations) {
+			for (ReservationStation station : group.stations) {
+				if (!station.busy) {
+					continue;
+				}
+
+				if (station.Qj.equals("0") && station.Qk.equals("0")) {
+					return;
+				}
+
+				if (cdb.tag == null) {
+					return;
+				}
+
+				if (cdb.tag.equals(station.Qj)) {
+					station.Vj = cdb.value;
+					station.Qj = "0";
+				}
+				if (cdb.tag.equals(station.Qk)) {
+					station.Vk = cdb.value;
+					station.Qk = "0";
+				}
+
+				if (station.Qj.equals("0") && station.Qk.equals("0")) {
+					station.executionStartCycle = cycle + 1;
+					station.executionEndCycle = cycle + getLatency(station.operation);
+				}
 			}
 		}
 	}
+
+	private void checkBusRegisterFile() {
+		if (cdb.tag == null) {
+			return;
+		}
+		for (Register register : registerFile.registers) {
+			if (cdb.tag.equals(register.tag)) {
+				register.setValue(cdb.value);
+				register.setTag(null);
+				System.out.println("Broadcasting result to register: " + register.getName());
+			}
+		}
+	}
+
 	private void executeStage() {
 		for (ReservationStationGroup group : reservationStations) {
 			for (ReservationStation station : group.stations) {
 				if (station.busy && station.isReadyToExecute()) {
 					if (station.executionStartCycle == 0) {
-						station.executionStartCycle = cycle;
-						station.executionEndCycle = cycle + getLatency(station.operation) -1;
+						station.executionStartCycle = cycle + 1;
+						station.executionEndCycle = cycle + getLatency(station.operation);
+						continue;
+					}
+					if (station.executionStartCycle <= cycle && station.executionEndCycle > cycle) {
 						System.out.println("Executing instruction: " + station);
-					} else if (station.executionEndCycle == cycle) {
+					}
+
+					if (station.executionEndCycle == cycle) {
 						switch (InstructionType.valueOf(station.operation.toString())) {
 							case ADD_D:
 							case ADD_S:
@@ -129,15 +166,19 @@ public class Processor {
 								break;
 							case DADDI:
 							case DSUBI:
-								station.resultValue = String.valueOf(Integer.parseInt(station.Vj) + Integer.parseInt(station.Vk));
+								station.resultValue = String.valueOf(Double.parseDouble(station.Vj) + Double.parseDouble(station.Vk));
 								break;
 							// Add cases for LOAD, STORE, and others as needed
+							default:
+								break;
 						}
+						System.out.println("Execution finished for station: " + station);
 					}
 				}
 			}
 		}
 	}
+
 	private ReservationStation findStationByTag(String tag) {
 		for (ReservationStationGroup group : reservationStations) {
 			for (ReservationStation station : group.stations) {
@@ -148,6 +189,7 @@ public class Processor {
 		}
 		return null;
 	}
+
 	private int countDependencies(ReservationStation station) {
 		int dependencies = 0;
 
@@ -173,21 +215,21 @@ public class Processor {
 
 		return dependencies;
 	}
+
 	private void writeResultStage() {
 		List<ReservationStation> readyStations = new ArrayList<>();
 
 		// Collect all stations ready to write their results
 		for (ReservationStationGroup group : reservationStations) {
 			for (ReservationStation station : group.stations) {
-				if (station.executionEndCycle + 1 == cycle) {
+				if (station.executionEndCycle == cycle - 1 && station.busy) {
 					readyStations.add(station); // Add ready station
 				}
-				checkBus(station);
 			}
 		}
 		if (!readyStations.isEmpty()) {
 			// Find the most prioritized station
-			ReservationStation prioritizedStation = readyStations.get(0);
+			ReservationStation prioritizedStation = readyStations.getFirst();
 			int maxDependencies = -1;
 
 			for (ReservationStation station : readyStations) {
@@ -198,31 +240,78 @@ public class Processor {
 				}
 			}
 
-			// Write result to destination register
-			Register dest = registerFile.getRegister(Integer.parseInt(prioritizedStation.tag.substring(1)));
-			dest.setValue(prioritizedStation.resultValue);
-			dest.setReady(true);
-			dest.setTag("0");
-
 			// Broadcast result to CDB
 			cdb.tag = prioritizedStation.tag;
 			cdb.value = prioritizedStation.resultValue;
 
+			System.out.println("Writing result from station: " + prioritizedStation);
+
 			// Reset the prioritized reservation station
 			prioritizedStation.reset();
-
-			System.out.println("Writing result from station: " + prioritizedStation);
 		}
 		checkBusRegisterFile();
+		checkBusReservationStations();
 	}
 
-	public void simulate(){
-		while (!instructionQueue.isEmpty() || !reservationStations.isEmpty()) {
+	private boolean canIssue() {
+		if (instructionQueue.isEmpty()) {
+			return false;
+		}
+		for (ReservationStationGroup group : reservationStations) {
+			if (group.operation == instructionQueue.getFirst().operation) {
+				for (ReservationStation station : group.stations) {
+					if (!station.busy) {
+						return true;
+					}
+				}
+			}
+		}
+		return false;
+	}
+
+	public void simulate() {
+		while (!instructionQueue.isEmpty() || cycle < 100) {
 			System.out.println("Cycle: " + cycle);
-			issueStage();
+			if (canIssue() && !instructionQueue.isEmpty()) {
+				issueStage();
+			}
 			executeStage();
 			writeResultStage();
 			cycle++;
+			System.out.println("Register File: \n" + registerFile);
 		}
+	}
+
+	public static void main(String[] args) {
+		// Create reservation stations
+		List<ReservationStationGroup> reservationStations = new ArrayList<>();
+		reservationStations.add(new ReservationStationGroup(3, InstructionType.ADD_D));
+		reservationStations.add(new ReservationStationGroup(2, InstructionType.SUB_D));
+		reservationStations.add(new ReservationStationGroup(2, InstructionType.MUL_D));
+		reservationStations.add(new ReservationStationGroup(2, InstructionType.DIV_D));
+		reservationStations.add(new ReservationStationGroup(1, InstructionType.DADDI));
+
+		// Create data cache
+		Cache dataCache = new Cache(1024, 64, 1, 10);
+
+		// Create processor
+		Processor processor = new Processor(reservationStations, dataCache);
+
+		// Add instructions to the processor
+		processor.addInstruction(new Instruction("ADD_D", "F2", "F0", "F4"));
+		processor.addInstruction(new Instruction("SUB_D", "F6", "F2", "F8"));
+		processor.addInstruction(new Instruction("MUL_D", "F10", "F6", "F12"));
+		processor.addInstruction(new Instruction("DIV_D", "F14", "F10", "F16"));
+		processor.addInstruction(new Instruction("DADDI", "F14", "F1", "100"));
+
+		// Provide Latency for each instruction
+		InstructionType.setLatency(InstructionType.ADD_D, 2);
+		InstructionType.setLatency(InstructionType.SUB_D, 2);
+		InstructionType.setLatency(InstructionType.MUL_D, 10);
+		InstructionType.setLatency(InstructionType.DIV_D, 40);
+		InstructionType.setLatency(InstructionType.DADDI, 1);
+
+		// Simulate the processor
+		processor.simulate();
 	}
 }

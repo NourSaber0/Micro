@@ -13,4 +13,12 @@ public class RegisterFile {
 	public Register getRegister(int index) {
 		return registers[index];
 	}
+
+	public String toString() {
+		StringBuilder sb = new StringBuilder();
+		for (Register r : registers) {
+			sb.append(r + "\n");
+		}
+		return sb.toString();
+	}
 }
