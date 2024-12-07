@@ -10,6 +10,10 @@ public class Register {
 		//place random value
 		this.value = String.valueOf((int)(Math.random() * 10000000) / 1000.0);
 	}
+	public Register(String name, String value) {
+		this.name = name;
+		this.value = value;
+	}
 
 	public void setValue(String value) {
 		this.value = value;

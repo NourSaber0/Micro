@@ -12,7 +12,6 @@ public class Instruction {
 		this.src1 = src1;
 		this.src2 = src2;
 	}
-
 	public String toString() {
 		return operation + " " + dest + ", " + src1 + ", " + src2;
 	}
