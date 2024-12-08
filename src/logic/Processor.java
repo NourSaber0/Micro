@@ -67,16 +67,16 @@ public class Processor {
 				buffer.address = instruction.src1;
 
 				Register dest = registerFile.getRegister(Integer.parseInt(instruction.dest.substring(1)));
-				if (instruction.operation == InstructionType.S_D) {
-					if (dest.getReady()) {
+				if (dest.getReady()) {
+					buffer.q = "0";
+					if (instruction.operation == InstructionType.S_D) {
 						buffer.value = dest.getValue();
-						buffer.q = "0";
-					} else {
-						buffer.q = dest.getTag();
 					}
 				} else {
-					dest.setTag(buffer.tag);
+					buffer.q = dest.getTag();
 				}
+				dest.setTag(buffer.tag);
+
 			} else {
 				ReservationStation station = getFreeStation(instruction.operation);
 				if (station == null) {
@@ -246,7 +246,7 @@ public class Processor {
 				if (buffer.busy && buffer.q.equals("0")) {
 					if (buffer.executionStartCycle == 0) {
 						buffer.executionStartCycle = cycle + 1;
-						buffer.executionEndCycle = cycle + getLatency(buffer.operation);
+						buffer.executionEndCycle = cycle + data.getLatency(Integer.parseInt(buffer.address));
 						continue;
 					}
 					if (buffer.executionStartCycle <= cycle && buffer.executionEndCycle > cycle) {
@@ -460,7 +460,7 @@ public class Processor {
 			executeStage();
 			writeResultStage();
 			cycle++;
-			//System.out.println("Register File: \n" + registerFile);
+			System.out.println("Register File: \n" + registerFile);
 		}
 	}
 

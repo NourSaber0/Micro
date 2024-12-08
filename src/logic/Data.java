@@ -98,6 +98,10 @@ public class Data {
 		public Memory(int size) {
 			this.size = size;
 			this.data = new String[size];
+			for (int i = 0; i < size; i++) {
+				data[i] = Integer.toString((int) (Math.random() * 100));
+			}
+
 		}
 
 		public void write(int address, String value) {
