@@ -4,11 +4,12 @@ public class LoadStoreBuffer {
 	String address;
 	String value;
 	String tag;
-	String Q;
+	String q;
 	InstructionType operation;
 	boolean busy;
 
-	int executionStartCycle = 0, executionEndCycle = 0;
+	int executionStartCycle = 0;
+	int executionEndCycle = 0;
 
 	public LoadStoreBuffer(String tag) {
 		this.busy = false;
@@ -17,7 +18,11 @@ public class LoadStoreBuffer {
 	public void reset() {
 		busy = false;
 		operation = null;
-		address = value = tag = Q = null;
+		address = value = tag = q = null;
 		executionStartCycle = executionEndCycle = 0;
+	}
+
+	public String toString() {
+		return tag + " " + operation + " " + address + " " + value + " " + q + " " + executionStartCycle + " " + executionEndCycle + " " + busy;
 	}
 }
