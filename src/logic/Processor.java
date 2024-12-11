@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static logic.InstructionType.getLatency;
+import static logic.InstructionType.isMemoryOperation;
 
 public class Processor {
 	private final List<Instruction> instructionQueue = new ArrayList<>();
@@ -56,7 +57,7 @@ public class Processor {
 		if (instructionQueue.isEmpty()) return;
 		Instruction instruction = instructionQueue.getFirst();
 		try {
-			if (instruction.operation == InstructionType.L_D || instruction.operation == InstructionType.S_D) {
+			if (isMemoryOperation(instruction.operation) ){
 				LoadStoreBuffer buffer = getFreeLoadStoreBuffer(instruction.operation);
 				if (buffer == null) {
 					System.out.println("No free load store buffer for operation: " + instruction.operation);
@@ -75,8 +76,9 @@ public class Processor {
 				} else {
 					buffer.q = dest.getTag();
 				}
-				dest.setTag(buffer.tag);
-
+				if (instruction.operation == InstructionType.L_D) {
+					dest.setTag(buffer.tag);
+				}
 			} else {
 				ReservationStation station = getFreeStation(instruction.operation);
 				if (station == null) {
@@ -161,26 +163,36 @@ public class Processor {
 	private void checkBusLoadStoreBuffer() {
 		for (LoadStoreBufferGroup group : loadStoreBuffers) {
 			for (LoadStoreBuffer buffer : group.loadStoreBuffers) {
+				//System.out.println(buffer);
 				if (!buffer.busy) {
+					//System.out.println("not busy");
 					continue;
 				}
 
 				if (buffer.q.equals("0")) {
-					return;
+					//System.out.println("q is 0");
+					continue;
 				}
 
 				if (cdb.tag == null) {
-					return;
+					//System.out.println("cdb tag is null");
+					continue;
 				}
-
+				//reset bus
 				if (cdb.tag.equals(buffer.q)) {
-					buffer.value = cdb.value;
+					// only for stores
+					if (buffer.operation == InstructionType.S_D) {
+						buffer.value = cdb.value;
+					}
+					// for both
 					buffer.q = "0";
+					//System.out.println("Broadcasting result to buffer: " + buffer);
 				}
 
 				if (buffer.q.equals("0")) {
 					buffer.executionStartCycle = cycle + 1;
 					buffer.executionEndCycle = cycle + getLatency(buffer.operation);
+					//System.out.println("Execution start cycle: " + buffer.executionStartCycle);
 				}
 			}
 		}
@@ -200,16 +212,12 @@ public class Processor {
 	}
 
 	private void executeStage() {
+		// at end of execution update destination register (ASK ALY)
 		for (ReservationStationGroup group : reservationStations) {
 			for (ReservationStation station : group.stations) {
 				if (station.busy && station.isReadyToExecute()) {
 					if (station.executionStartCycle == 0) {
-
 						station.executionStartCycle = cycle + 1;
-						if (station.operation.startsWith("L_D") || station.operation.startsWith("S_D")) {
-							// Load data from memory
-							station.executionEndCycle = (data.getLatency(Integer.parseInt(station.Vj)) + cycle);
-						}
 						station.executionEndCycle = cycle + getLatency(station.operation);
 						continue;
 					}
@@ -295,6 +303,14 @@ public class Processor {
 				}
 			}
 		}
+		// check load store buffers
+		for (LoadStoreBufferGroup group : loadStoreBuffers) {
+			for (LoadStoreBuffer buffer : group.loadStoreBuffers) {
+				if (buffer.q != null && buffer.q.equals(station.tag)) {
+					dependencies++;
+				}
+			}
+		}
 
 		// Check registers
 		for (int i = 0; i < 32; i++) {
@@ -321,6 +337,14 @@ public class Processor {
 				}
 			}
 		}
+		// check load store buffers
+		for (LoadStoreBufferGroup group : loadStoreBuffers) {
+			for (LoadStoreBuffer b : group.loadStoreBuffers) {
+				if (b.q != null && b.q.equals(buffer.tag)) {
+					dependencies++;
+				}
+			}
+		}
 
 		// Check registers
 		for (int i = 0; i < 32; i++) {
@@ -339,13 +363,20 @@ public class Processor {
 			for (ReservationStation station : group.stations) {
 				if (station.executionEndCycle == cycle - 1 && station.busy) {
 					readyStations.add(station); // Add ready station
+					//System.out.println("Ready station: " + station);
 				}
 			}
 		}
+		// only for loads
 		for (LoadStoreBufferGroup group : loadStoreBuffers) {
 			for (LoadStoreBuffer buffer : group.loadStoreBuffers) {
 				if (buffer.executionEndCycle == cycle - 1 && buffer.busy) {
-					readyBuffers.add(buffer); // Add ready station
+					if (buffer.operation == InstructionType.L_D) {
+						readyBuffers.add(buffer); // Add ready station
+					}
+					else {
+						buffer.reset();
+					}
 				}
 			}
 		}
@@ -386,6 +417,7 @@ public class Processor {
 
 				prioritizedBuffer.reset();
 			} else if (prioritizedStation != null) {
+				//System.out.println("Prioritized station: " + prioritizedStation);
 				readyStations.remove(prioritizedStation);
 				cdb.tag = prioritizedStation.tag;
 				cdb.value = prioritizedStation.resultValue;
@@ -395,9 +427,11 @@ public class Processor {
 				prioritizedStation.reset();
 			}
 		}
+
 		checkBusRegisterFile();
 		checkBusReservationStations();
 		checkBusLoadStoreBuffer();
+		cdb.reset();
 	}
 
 	private boolean canIssue() {
@@ -441,6 +475,15 @@ public class Processor {
 			}
 		}
 
+			for (LoadStoreBufferGroup group : loadStoreBuffers) {
+				for (LoadStoreBuffer buffer : group.loadStoreBuffers) {
+					if (buffer.busy) {
+						System.out.println("Buffer busy: " + buffer);
+						return false;
+					}
+				}
+			}
+
 		// Check if any registers are waiting for a result
 		for (Register register : registerFile.registers) {
 			if (register.tag != null) {
@@ -480,7 +523,7 @@ public class Processor {
 		loadStoreBuffers.add(new LoadStoreBufferGroup(2, InstructionType.S_D));
 
 		// Create Data
-		Data data = new Data(5, 2, 2, 20, 100);
+		Data data = new Data(5, 2, 2, 10, 100);
 		// Create processor
 		Processor processor = new Processor(reservationStations, loadStoreBuffers, data);
 

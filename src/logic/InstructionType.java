@@ -94,7 +94,7 @@ public enum InstructionType {
 	}
 
 	public static boolean isMemoryOperation(InstructionType type) {
-		return type == LW || type == LD || type == SW || type == SD || type == L_S || type == L_D;
+		return type == LW || type == LD || type == SW || type == SD || type == L_S || type == L_D|| type == S_S || type == S_D;
 	}
 
 	public boolean startsWith(String s) {
