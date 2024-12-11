@@ -603,7 +603,9 @@ public class Processor {
 
 		List<Instruction> instructionQueueCopy = new ArrayList<>(instructionQueue);
 
-		return new CycleState(reservationStationsCopy, loadStoreBuffersCopy, cdb, instructionQueueCopy, cycle, isSimulationComplete());
+		Data dataCopy = new Data(data);
+
+		return new CycleState(reservationStationsCopy, loadStoreBuffersCopy, cdb, instructionQueueCopy, dataCopy, cycle, isSimulationComplete());
 	}
 
 }

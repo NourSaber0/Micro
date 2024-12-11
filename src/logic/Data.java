@@ -13,6 +13,17 @@ public class Data {
 		this.memory = new Memory(memorySize);
 	}
 
+	public Data(Data data) {
+		this.cache = new Cache(data.cache.cacheSize, data.cache.blockSize, data.cache.hitLatency, data.cache.missPenalty);
+		for (int tag : data.cache.cache.keySet()) {
+			Cache.CacheBlock block = data.cache.cache.get(tag);
+			this.cache.cache.put(tag, new Cache.CacheBlock(block.data, block.cacheTag));
+		}
+
+		this.memory = new Memory(data.memory.size);
+		if (data.memory.size >= 0) System.arraycopy(data.memory.data, 0, this.memory.data, 0, data.memory.size);
+	}
+
 	public int getLatency(int address) {
 		return cache.isInCache(address) ? cache.hitLatency : cache.missPenalty;
 	}
