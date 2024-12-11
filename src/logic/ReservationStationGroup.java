@@ -12,4 +12,13 @@ public class ReservationStationGroup {
 			stations[i] = new ReservationStation(operation.name() + i);
 		}
 	}
+
+	public String toString() {
+		StringBuilder sb = new StringBuilder();
+		sb.append(operation + ": \n");
+		for (ReservationStation station : stations) {
+			sb.append(station.toString()).append("\n");
+		}
+		return sb.toString();
+	}
 }

@@ -7,6 +7,7 @@ import static logic.InstructionType.getLatency;
 import static logic.InstructionType.isMemoryOperation;
 
 public class Processor {
+	private final List<CycleState> cycleStates = new ArrayList<>();
 	private final List<Instruction> instructionQueue = new ArrayList<>();
 	private final List<ReservationStationGroup> reservationStations;
 	private final List<LoadStoreBufferGroup> loadStoreBuffers;
@@ -21,6 +22,49 @@ public class Processor {
 		this.reservationStations = reservationStations;
 		this.loadStoreBuffers = loadStoreBuffers;
 		this.data = data;
+	}
+
+	public static void main(String[] args) {
+		// Create reservation stations
+		List<ReservationStationGroup> reservationStations = new ArrayList<>();
+		reservationStations.add(new ReservationStationGroup(3, InstructionType.ADD_D));
+		reservationStations.add(new ReservationStationGroup(2, InstructionType.SUB_D));
+		reservationStations.add(new ReservationStationGroup(2, InstructionType.MUL_D));
+		reservationStations.add(new ReservationStationGroup(2, InstructionType.DIV_D));
+		reservationStations.add(new ReservationStationGroup(1, InstructionType.DADDI));
+
+		// Create LoadStoreBuffers
+		List<LoadStoreBufferGroup> loadStoreBuffers = new ArrayList<>();
+		loadStoreBuffers.add(new LoadStoreBufferGroup(2, InstructionType.L_D));
+		loadStoreBuffers.add(new LoadStoreBufferGroup(2, InstructionType.S_D));
+
+
+		// Create Data
+		Data data = new Data(5, 2, 2, 10, 100);
+		// Create processor
+		Processor processor = new Processor(reservationStations, loadStoreBuffers, data);
+
+		// Add instructions to the processor
+		processor.addInstruction(new Instruction("L_D", "F0", "0", null));
+		processor.addInstruction(new Instruction("ADD_D", "F2", "F0", "F4"));
+		processor.addInstruction(new Instruction("SUB_D", "F6", "F2", "F8"));
+		processor.addInstruction(new Instruction("MUL_D", "F10", "F6", "F12"));
+		processor.addInstruction(new Instruction("DIV_D", "F14", "F10", "F16"));
+		processor.addInstruction(new Instruction("DADDI", "F14", "F1", "100"));
+		processor.addInstruction(new Instruction("S_D", "F14", "0", null));
+
+		// Provide Latency for each instruction
+		InstructionType.setLatency(InstructionType.ADD_D, 2);
+		InstructionType.setLatency(InstructionType.SUB_D, 2);
+		InstructionType.setLatency(InstructionType.MUL_D, 10);
+		InstructionType.setLatency(InstructionType.DIV_D, 40);
+		InstructionType.setLatency(InstructionType.DADDI, 1);
+
+		// Simulate the processor
+		processor.simulateAll();
+
+		System.out.println(data);
+
 	}
 
 	public void addInstruction(Instruction instruction) {
@@ -57,7 +101,7 @@ public class Processor {
 		if (instructionQueue.isEmpty()) return;
 		Instruction instruction = instructionQueue.getFirst();
 		try {
-			if (isMemoryOperation(instruction.operation) ){
+			if (isMemoryOperation(instruction.operation)) {
 				LoadStoreBuffer buffer = getFreeLoadStoreBuffer(instruction.operation);
 				if (buffer == null) {
 					System.out.println("No free load store buffer for operation: " + instruction.operation);
@@ -115,8 +159,6 @@ public class Processor {
 				Register dest = registerFile.getRegister(Integer.parseInt(instruction.dest.substring(1)));
 				dest.setTag(station.tag);
 			}
-			// Update instruction metadata
-			instruction.issueCycle = cycle;
 
 			// Remove instruction from the queue
 			instructionQueue.removeFirst();
@@ -165,19 +207,17 @@ public class Processor {
 			for (LoadStoreBuffer buffer : group.loadStoreBuffers) {
 				//System.out.println(buffer);
 				if (!buffer.busy) {
-					//System.out.println("not busy");
 					continue;
 				}
 
 				if (buffer.q.equals("0")) {
-					//System.out.println("q is 0");
 					continue;
 				}
 
 				if (cdb.tag == null) {
-					//System.out.println("cdb tag is null");
 					continue;
 				}
+
 				//reset bus
 				if (cdb.tag.equals(buffer.q)) {
 					// only for stores
@@ -191,7 +231,7 @@ public class Processor {
 
 				if (buffer.q.equals("0")) {
 					buffer.executionStartCycle = cycle + 1;
-					buffer.executionEndCycle = cycle + getLatency(buffer.operation);
+					buffer.executionEndCycle = cycle + data.getLatency(Integer.parseInt(buffer.address));
 					//System.out.println("Execution start cycle: " + buffer.executionStartCycle);
 				}
 			}
@@ -249,9 +289,11 @@ public class Processor {
 				}
 			}
 		}
+
 		for (LoadStoreBufferGroup group : loadStoreBuffers) {
 			for (LoadStoreBuffer buffer : group.loadStoreBuffers) {
 				if (buffer.busy && buffer.q.equals("0")) {
+					System.out.println("Buffer: " + buffer);
 					if (buffer.executionStartCycle == 0) {
 						buffer.executionStartCycle = cycle + 1;
 						buffer.executionEndCycle = cycle + data.getLatency(Integer.parseInt(buffer.address));
@@ -367,19 +409,20 @@ public class Processor {
 				}
 			}
 		}
+
 		// only for loads
 		for (LoadStoreBufferGroup group : loadStoreBuffers) {
 			for (LoadStoreBuffer buffer : group.loadStoreBuffers) {
 				if (buffer.executionEndCycle == cycle - 1 && buffer.busy) {
 					if (buffer.operation == InstructionType.L_D) {
 						readyBuffers.add(buffer); // Add ready station
-					}
-					else {
+					} else {
 						buffer.reset();
 					}
 				}
 			}
 		}
+
 		if (!readyStations.isEmpty() || !readyBuffers.isEmpty()) {
 			ReservationStation prioritizedStation = null;
 			LoadStoreBuffer prioritizedBuffer = null;
@@ -427,7 +470,6 @@ public class Processor {
 				prioritizedStation.reset();
 			}
 		}
-
 		checkBusRegisterFile();
 		checkBusReservationStations();
 		checkBusLoadStoreBuffer();
@@ -475,14 +517,14 @@ public class Processor {
 			}
 		}
 
-			for (LoadStoreBufferGroup group : loadStoreBuffers) {
-				for (LoadStoreBuffer buffer : group.loadStoreBuffers) {
-					if (buffer.busy) {
-						System.out.println("Buffer busy: " + buffer);
-						return false;
-					}
+		for (LoadStoreBufferGroup group : loadStoreBuffers) {
+			for (LoadStoreBuffer buffer : group.loadStoreBuffers) {
+				if (buffer.busy) {
+					System.out.println("Buffer busy: " + buffer);
+					return false;
 				}
 			}
+		}
 
 		// Check if any registers are waiting for a result
 		for (Register register : registerFile.registers) {
@@ -495,57 +537,73 @@ public class Processor {
 	}
 
 	public void simulate() {
-		while (!isSimulationComplete() && cycle < 100) {
-			System.out.println("Cycle: " + cycle);
-			if (canIssue() && !instructionQueue.isEmpty()) {
-				issueStage();
-			}
-			executeStage();
-			writeResultStage();
-			cycle++;
-			System.out.println("Register File: \n" + registerFile);
+		System.out.println("Cycle: " + cycle);
+		if (canIssue() && !instructionQueue.isEmpty()) {
+			issueStage();
+		}
+		executeStage();
+		writeResultStage();
+
+		// Save cycle state
+		cycleStates.add(getCurrentCycleState());
+
+		System.out.println("Register File: \n" + registerFile);
+
+		cycle++;
+	}
+
+	public void simulateAll() {
+		while (!isSimulationComplete()) {
+			simulate();
 		}
 	}
 
-
-	public static void main(String[] args) {
-		// Create reservation stations
-		List<ReservationStationGroup> reservationStations = new ArrayList<>();
-		reservationStations.add(new ReservationStationGroup(3, InstructionType.ADD_D));
-		reservationStations.add(new ReservationStationGroup(2, InstructionType.SUB_D));
-		reservationStations.add(new ReservationStationGroup(2, InstructionType.MUL_D));
-		reservationStations.add(new ReservationStationGroup(2, InstructionType.DIV_D));
-		reservationStations.add(new ReservationStationGroup(1, InstructionType.DADDI));
-
-		// Create LoadStoreBuffers
-		List<LoadStoreBufferGroup> loadStoreBuffers = new ArrayList<>();
-		loadStoreBuffers.add(new LoadStoreBufferGroup(2, InstructionType.L_D));
-		loadStoreBuffers.add(new LoadStoreBufferGroup(2, InstructionType.S_D));
-
-		// Create Data
-		Data data = new Data(5, 2, 2, 10, 100);
-		// Create processor
-		Processor processor = new Processor(reservationStations, loadStoreBuffers, data);
-
-		// Add instructions to the processor
-		processor.addInstruction(new Instruction("L_D", "F0", "0", null));
-		processor.addInstruction(new Instruction("ADD_D", "F2", "F0", "F4"));
-		processor.addInstruction(new Instruction("SUB_D", "F6", "F2", "F8"));
-		processor.addInstruction(new Instruction("MUL_D", "F10", "F6", "F12"));
-		processor.addInstruction(new Instruction("DIV_D", "F14", "F10", "F16"));
-		processor.addInstruction(new Instruction("DADDI", "F14", "F1", "100"));
-		processor.addInstruction(new Instruction("S_D", "F14", "12", null));
-
-		// Provide Latency for each instruction
-		InstructionType.setLatency(InstructionType.ADD_D, 2);
-		InstructionType.setLatency(InstructionType.SUB_D, 2);
-		InstructionType.setLatency(InstructionType.MUL_D, 10);
-		InstructionType.setLatency(InstructionType.DIV_D, 40);
-		InstructionType.setLatency(InstructionType.DADDI, 1);
-
-		// Simulate the processor
-		processor.simulate();
-
-		System.out.println(data);
+	public List<CycleState> getCycleStates() {
+		return cycleStates;
 	}
+
+	private CycleState getCurrentCycleState() {
+		List<ReservationStationGroup> reservationStationsCopy = new ArrayList<>();
+		for (ReservationStationGroup group : reservationStations) {
+			ReservationStationGroup groupCopy = new ReservationStationGroup(group.stations.length, group.operation);
+			int i = 0;
+			for (ReservationStation station : group.stations) {
+				ReservationStation stationCopy = new ReservationStation(station.tag);
+				stationCopy.busy = station.busy;
+				stationCopy.operation = station.operation;
+				stationCopy.Vj = station.Vj;
+				stationCopy.Vk = station.Vk;
+				stationCopy.Qj = station.Qj;
+				stationCopy.Qk = station.Qk;
+				stationCopy.resultValue = station.resultValue;
+				stationCopy.executionStartCycle = station.executionStartCycle;
+				stationCopy.executionEndCycle = station.executionEndCycle;
+				groupCopy.stations[i++] = stationCopy;
+			}
+			reservationStationsCopy.add(groupCopy);
+		}
+
+		List<LoadStoreBufferGroup> loadStoreBuffersCopy = new ArrayList<>();
+		for (LoadStoreBufferGroup group : loadStoreBuffers) {
+			LoadStoreBufferGroup groupCopy = new LoadStoreBufferGroup(group.loadStoreBuffers.length, group.operation);
+			int i = 0;
+			for (LoadStoreBuffer buffer : group.loadStoreBuffers) {
+				LoadStoreBuffer bufferCopy = new LoadStoreBuffer(buffer.tag);
+				bufferCopy.busy = buffer.busy;
+				bufferCopy.operation = buffer.operation;
+				bufferCopy.address = buffer.address;
+				bufferCopy.value = buffer.value;
+				bufferCopy.q = buffer.q;
+				bufferCopy.executionStartCycle = buffer.executionStartCycle;
+				bufferCopy.executionEndCycle = buffer.executionEndCycle;
+				groupCopy.loadStoreBuffers[i++] = bufferCopy;
+			}
+			loadStoreBuffersCopy.add(groupCopy);
+		}
+
+		List<Instruction> instructionQueueCopy = new ArrayList<>(instructionQueue);
+
+		return new CycleState(reservationStationsCopy, loadStoreBuffersCopy, cdb, instructionQueueCopy, cycle, isSimulationComplete());
+	}
+
 }

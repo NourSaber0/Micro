@@ -18,6 +18,7 @@ public class LoadStoreBufferGroup {
 
 	public String toString() {
 		StringBuilder sb = new StringBuilder();
+		sb.append(operation + ": \n");
 		for (LoadStoreBuffer lsb : loadStoreBuffers) {
 			sb.append(lsb + "\n");
 		}

@@ -8,8 +8,13 @@ public class CommonDataBus {
 		this.tag = tag;
 		this.value = value;
 	}
+
 	public void reset() {
 		tag = null;
 		value = null;
+	}
+
+	public String toString() {
+		return tag + " " + value;
 	}
 }
