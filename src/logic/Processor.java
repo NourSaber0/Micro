@@ -3,28 +3,33 @@ package logic;
 import java.util.ArrayList;
 import java.util.List;
 
-import static logic.InstructionType.*;
+import static logic.InstructionType.getLatency;
+import static logic.InstructionType.isMemoryOperation;
 
 public class Processor {
+	private static boolean isBranchExecuting = false;
 	private final List<CycleState> cycleStates = new ArrayList<>();
-	private final List<Instruction> instructionQueue = new ArrayList<>();
-	private final List<Instruction> instructions = new ArrayList<>();
+	private final List<Instruction> instructionQueue;
+	private final List<Instruction> instructions;
 	private final List<ReservationStationGroup> reservationStations;
 	private final List<LoadStoreBufferGroup> loadStoreBuffers;
-	private final  LoadStoreBuffer branchBuffer = new LoadStoreBuffer("branch");
+	private final LoadStoreBuffer branchBuffer = new LoadStoreBuffer("branch");
 	private final RegisterFile registerFile = new RegisterFile(32); // Example: 32 registers
 	private final CommonDataBus cdb = new CommonDataBus();
 	private final Data data;
 	List<ReservationStation> readyStations = new ArrayList<>();
 	List<LoadStoreBuffer> readyBuffers = new ArrayList<>();
+	private int cycle = 0;
 
-	private int cycle = 1;
-	private static boolean isBranchExecuting = false;
-
-	public Processor(List<ReservationStationGroup> reservationStations, List<LoadStoreBufferGroup> loadStoreBuffers, Data data) {
+	public Processor(List<ReservationStationGroup> reservationStations, List<LoadStoreBufferGroup> loadStoreBuffers, Data data, List<Instruction> instructions) {
 		this.reservationStations = reservationStations;
 		this.loadStoreBuffers = loadStoreBuffers;
 		this.data = data;
+		this.instructionQueue = new ArrayList<>(instructions);
+		this.instructions = new ArrayList<>(instructions);
+
+
+		cycleStates.add(getCurrentCycleState());
 	}
 
 	public static void main(String[] args) {
@@ -45,21 +50,22 @@ public class Processor {
 
 		// Create Data
 		Data data = new Data(5, 2, 2, 10, 100);
-		// Create processor
-		Processor processor = new Processor(reservationStations, loadStoreBuffers, data);
 
-		// Add instructions to the processor
-		processor.addInstruction(new Instruction("L_D", "F0", "0", null));
-		processor.addInstruction(new Instruction("ADD_D", "F2", "F0", "F4"));
-		processor.addInstruction(new Instruction("SUB_D", "F6", "F2", "F2"));
-		processor.addInstruction(new Instruction("DADDI", "F6", "F6", "1"));
-		processor.addInstruction(new Instruction("DSUBI", "F4", "F6", "2"));
-		processor.addInstruction(new Instruction("BNE", "F4", "3", null));
-		processor.addInstruction(new Instruction("S_D", "F2", "4", null));
-		processor.addInstruction(new Instruction("MUL_D", "F10", "F6", "F12"));
-		processor.addInstruction(new Instruction("DIV_D", "F14", "F10", "F16"));
-		processor.addInstruction(new Instruction("DADDI", "F14", "F1", "100"));
-		processor.addInstruction(new Instruction("S_D", "F14", "0", null));
+		ArrayList<Instruction> instructions = new ArrayList<>();
+		instructions.add(new Instruction("L_D", "F0", "0", null));
+		instructions.add(new Instruction("ADD_D", "F2", "F0", "F4"));
+		instructions.add(new Instruction("SUB_D", "F6", "F2", "F2"));
+		instructions.add(new Instruction("DADDI", "F6", "F6", "1"));
+		instructions.add(new Instruction("DSUBI", "F4", "F6", "2"));
+		instructions.add(new Instruction("BNE", "F4", "3", null));
+		instructions.add(new Instruction("S_D", "F2", "4", null));
+		instructions.add(new Instruction("MUL_D", "F10", "F6", "F12"));
+		instructions.add(new Instruction("DIV_D", "F14", "F10", "F16"));
+		instructions.add(new Instruction("DADDI", "F14", "F1", "100"));
+		instructions.add(new Instruction("S_D", "F14", "0", null));
+
+		// Create processor
+		Processor processor = new Processor(reservationStations, loadStoreBuffers, data, instructions);
 
 		// Provide Latency for each instruction
 		InstructionType.setLatency(InstructionType.ADD_D, 2);
@@ -74,6 +80,7 @@ public class Processor {
 		System.out.println(data);
 
 	}
+
 	public CycleState getCycleState(int cycle) {
 		if (cycle >= 0 && cycle < cycleStates.size()) {
 			return cycleStates.get(cycle);
@@ -81,6 +88,7 @@ public class Processor {
 			throw new IndexOutOfBoundsException("Cycle out of range: " + cycle);
 		}
 	}
+
 	public void addInstruction(Instruction instruction) {
 		instructionQueue.add(instruction);
 		instructions.add(instruction);
@@ -169,23 +177,23 @@ public class Processor {
 
 				Register src1 = registerFile.getRegister(Integer.parseInt(instruction.src1.substring(1)));
 				if (src1.getReady()) {
-					station.Vj = src1.getValue();
-					station.Qj = "0";
+					station.vj = src1.getValue();
+					station.qJ = "0";
 				} else {
-					station.Qj = src1.getTag();
+					station.qJ = src1.getTag();
 				}
 				Register src2;
 				if (instruction.operation != InstructionType.DADDI && instruction.operation != InstructionType.DSUBI) {
 					src2 = registerFile.getRegister(Integer.parseInt(instruction.src2.substring(1)));
 					if (src2.getReady()) {
-						station.Vk = src2.getValue();
-						station.Qk = "0";
+						station.vK = src2.getValue();
+						station.qK = "0";
 					} else {
-						station.Qk = src2.getTag();
+						station.qK = src2.getTag();
 					}
 				} else {
-					station.Vk = instruction.src2;
-					station.Qk = "0";
+					station.vK = instruction.src2;
+					station.qK = "0";
 				}
 
 				// Update destination register
@@ -210,7 +218,7 @@ public class Processor {
 					continue;
 				}
 
-				if (station.Qj.equals("0") && station.Qk.equals("0")) {
+				if (station.qJ.equals("0") && station.qK.equals("0")) {
 					return;
 				}
 
@@ -218,16 +226,16 @@ public class Processor {
 					return;
 				}
 
-				if (cdb.tag.equals(station.Qj)) {
-					station.Vj = cdb.value;
-					station.Qj = "0";
+				if (cdb.tag.equals(station.qJ)) {
+					station.vj = cdb.value;
+					station.qJ = "0";
 				}
-				if (cdb.tag.equals(station.Qk)) {
-					station.Vk = cdb.value;
-					station.Qk = "0";
+				if (cdb.tag.equals(station.qK)) {
+					station.vK = cdb.value;
+					station.qK = "0";
 				}
 
-				if (station.Qj.equals("0") && station.Qk.equals("0")) {
+				if (station.qJ.equals("0") && station.qK.equals("0")) {
 					station.executionStartCycle = cycle + 1;
 					station.executionEndCycle = cycle + getLatency(station.operation);
 				}
@@ -319,7 +327,7 @@ public class Processor {
 		}
 		for (ReservationStationGroup group : reservationStations) {
 			for (ReservationStation station : group.stations) {
-				if (station.busy && station.isReadyToExecute() ){
+				if (station.busy && station.isReadyToExecute()) {
 					if (station.executionStartCycle == 0) {
 						station.executionStartCycle = cycle + 1;
 						station.executionEndCycle = cycle + getLatency(station.operation);
@@ -331,19 +339,19 @@ public class Processor {
 					if (station.executionEndCycle == cycle) {
 						switch (InstructionType.valueOf(station.operation.toString())) {
 							case ADD_D, ADD_S:
-								station.resultValue = String.valueOf(Double.parseDouble(station.Vj) + Double.parseDouble(station.Vk));
+								station.resultValue = String.valueOf(Double.parseDouble(station.vj) + Double.parseDouble(station.vK));
 								break;
 							case SUB_D, SUB_S, DSUBI:
-								station.resultValue = String.valueOf(Double.parseDouble(station.Vj) - Double.parseDouble(station.Vk));
+								station.resultValue = String.valueOf(Double.parseDouble(station.vj) - Double.parseDouble(station.vK));
 								break;
 							case MUL_D, MUL_S:
-								station.resultValue = String.valueOf(Double.parseDouble(station.Vj) * Double.parseDouble(station.Vk));
+								station.resultValue = String.valueOf(Double.parseDouble(station.vj) * Double.parseDouble(station.vK));
 								break;
 							case DIV_D, DIV_S:
-								station.resultValue = String.valueOf(Double.parseDouble(station.Vj) / Double.parseDouble(station.Vk));
+								station.resultValue = String.valueOf(Double.parseDouble(station.vj) / Double.parseDouble(station.vK));
 								break;
 							case DADDI:
-								station.resultValue = String.valueOf(Double.parseDouble(station.Vj) + Double.parseDouble(station.Vk));
+								station.resultValue = String.valueOf(Double.parseDouble(station.vj) + Double.parseDouble(station.vK));
 								break;
 
 							default:
@@ -402,10 +410,10 @@ public class Processor {
 		// Check other reservation stations
 		for (ReservationStationGroup group : reservationStations) {
 			for (ReservationStation s : group.stations) {
-				if (s.Qj != null && s.Qj.equals(station.tag)) {
+				if (s.qJ != null && s.qJ.equals(station.tag)) {
 					dependencies++;
 				}
-				if (s.Qk != null && s.Qk.equals(station.tag)) {
+				if (s.qK != null && s.qK.equals(station.tag)) {
 					dependencies++;
 				}
 			}
@@ -436,10 +444,10 @@ public class Processor {
 		// Check other reservation stations
 		for (ReservationStationGroup group : reservationStations) {
 			for (ReservationStation s : group.stations) {
-				if (s.Qj != null && s.Qj.equals(buffer.tag)) {
+				if (s.qJ != null && s.qJ.equals(buffer.tag)) {
 					dependencies++;
 				}
-				if (s.Qk != null && s.Qk.equals(buffer.tag)) {
+				if (s.qK != null && s.qK.equals(buffer.tag)) {
 					dependencies++;
 				}
 			}
@@ -619,8 +627,8 @@ public class Processor {
 	}
 
 	public void simulate() {
+		cycle++;
 		System.out.println("Cycle: " + cycle);
-		System.out.println( canIssue());
 		if (canIssue() && !instructionQueue.isEmpty()) {
 			issueStage();
 		}
@@ -631,8 +639,6 @@ public class Processor {
 		cycleStates.add(getCurrentCycleState());
 
 		System.out.println("Register File: \n" + registerFile);
-
-		cycle++;
 	}
 
 	public void simulateAll() {
@@ -654,10 +660,10 @@ public class Processor {
 				ReservationStation stationCopy = new ReservationStation(station.tag);
 				stationCopy.busy = station.busy;
 				stationCopy.operation = station.operation;
-				stationCopy.Vj = station.Vj;
-				stationCopy.Vk = station.Vk;
-				stationCopy.Qj = station.Qj;
-				stationCopy.Qk = station.Qk;
+				stationCopy.vj = station.vj;
+				stationCopy.vK = station.vK;
+				stationCopy.qJ = station.qJ;
+				stationCopy.qK = station.qK;
 				stationCopy.resultValue = station.resultValue;
 				stationCopy.executionStartCycle = station.executionStartCycle;
 				stationCopy.executionEndCycle = station.executionEndCycle;
@@ -688,11 +694,15 @@ public class Processor {
 
 		Data dataCopy = new Data(data);
 
-		return new CycleState(reservationStationsCopy, loadStoreBuffersCopy, cdb, instructionQueueCopy, dataCopy, cycle, isSimulationComplete());
+		RegisterFile registerFileCopy = new RegisterFile(registerFile);
+
+		return new CycleState(reservationStationsCopy, loadStoreBuffersCopy, cdb, instructionQueueCopy, registerFileCopy, dataCopy, cycle, isSimulationComplete());
 	}
+
 	public RegisterFile getRegisterFile() {
 		return registerFile;
 	}
+
 	public void reset() {
 		cycle = 1;
 		cycleStates.clear();

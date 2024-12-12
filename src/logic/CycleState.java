@@ -7,15 +7,17 @@ public class CycleState {
 	public final List<LoadStoreBufferGroup> loadStoreBuffers;
 	public final CommonDataBus commonDataBus;
 	public final List<Instruction> instructions;
+	public final RegisterFile registerFile;
 	public final Data data;
 	public final int cycle;
 	public final boolean isFinished;
 
-	public CycleState(List<ReservationStationGroup> reservationStations, List<LoadStoreBufferGroup> loadStoreBuffers, CommonDataBus commonDataBus, List<Instruction> instructions, Data data, int cycle, boolean isFinished) {
+	public CycleState(List<ReservationStationGroup> reservationStations, List<LoadStoreBufferGroup> loadStoreBuffers, CommonDataBus commonDataBus, List<Instruction> instructions, RegisterFile registerFile, Data data, int cycle, boolean isFinished) {
 		this.reservationStations = reservationStations;
 		this.loadStoreBuffers = loadStoreBuffers;
 		this.commonDataBus = commonDataBus;
 		this.instructions = instructions;
+		this.registerFile = registerFile;
 		this.data = data;
 		this.cycle = cycle;
 		this.isFinished = isFinished;

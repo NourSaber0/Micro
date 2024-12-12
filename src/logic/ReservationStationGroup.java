@@ -13,6 +13,10 @@ public class ReservationStationGroup {
 		}
 	}
 
+	public ReservationStation[] getStations() {
+		return stations;
+	}
+
 	public String toString() {
 		StringBuilder sb = new StringBuilder();
 		sb.append(operation + ": \n");

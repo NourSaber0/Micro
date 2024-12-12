@@ -13,6 +13,29 @@ public class Instruction {
 		this.src2 = src2;
 	}
 
+	public Instruction(Instruction instruction) {
+		this.operation = instruction.operation;
+		this.dest = instruction.dest;
+		this.src1 = instruction.src1;
+		this.src2 = instruction.src2;
+	}
+
+	public InstructionType getOperation() {
+		return operation;
+	}
+
+	public String getDest() {
+		return dest;
+	}
+
+	public String getSrc1() {
+		return src1;
+	}
+
+	public String getSrc2() {
+		return src2;
+	}
+
 	public String toString() {
 		return operation + " " + dest + ", " + src1 + ", " + src2;
 	}

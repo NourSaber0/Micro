@@ -13,8 +13,9 @@ public class LoadStoreBuffer {
 
 	public LoadStoreBuffer(String tag) {
 		this.busy = false;
-		this.tag= tag;
+		this.tag = tag;
 	}
+
 	public void reset() {
 		busy = false;
 		operation = null;

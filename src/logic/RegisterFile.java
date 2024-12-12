@@ -10,9 +10,17 @@ public class RegisterFile {
 		}
 	}
 
+	public RegisterFile(RegisterFile registerFile) {
+		registers = new Register[registerFile.registers.length];
+		for (int i = 0; i < registers.length; i++) {
+			registers[i] = new Register(registerFile.registers[i]);
+		}
+	}
+
 	public Register getRegister(int index) {
 		return registers[index];
 	}
+
 	public void reset() {
 		for (Register r : registers) {
 			r.reset();
