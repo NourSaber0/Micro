@@ -13,6 +13,11 @@ public class RegisterFile {
 	public Register getRegister(int index) {
 		return registers[index];
 	}
+	public void reset() {
+		for (Register r : registers) {
+			r.reset();
+		}
+	}
 
 	public String toString() {
 		StringBuilder sb = new StringBuilder();

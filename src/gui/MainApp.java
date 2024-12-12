@@ -2,8 +2,8 @@ package gui;
 
 import javafx.application.Application;
 import javafx.scene.Scene;
-import javafx.scene.control.ListView;
-import javafx.scene.layout.VBox;
+import javafx.scene.control.*;
+import javafx.scene.layout.*;
 import javafx.stage.Stage;
 import logic.*;
 
@@ -11,65 +11,109 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class MainApp extends Application {
-	private static final String TITLE = "JavaFX Application";
+	private static final String TITLE = "Tomasulo Simulator";
 	private List<CycleState> cycleStates;
+	private Processor processor;
 
 	public static void main(String[] args) {
 		launch(args);
 	}
 
+	@Override
+	public void start(Stage primaryStage) {
+		processor = initializeProcessor();
+		cycleStates = processor.getCycleStates();
+
+		// Main Layout
+		TabPane tabPane = new TabPane();
+		// Reservation Stations
+		VBox reservationStationsTable = createTableView("Reservation Stations");
+		// Load Store Buffers
+		VBox loadStoreBuffersTable = createTableView("Load Store Buffers");
+		// Register File
+		VBox registerFileTable = createTableView("Register File");
+		// Memory
+		VBox memoryTable = createTableView("Memory");
+		// Instruction Queue
+		VBox instructionQueueTable = createTableView("Instruction Queue");
+		// Display Tables in one tab
+		Tab tablesTab = new Tab("Tables");
+		tablesTab.setContent(new VBox(10, reservationStationsTable, loadStoreBuffersTable, registerFileTable, memoryTable, instructionQueueTable));
+		tabPane.getTabs().add(tablesTab);
+
+		// Control Panel
+		HBox controlPanel = createControlPanel();
+
+		// Menu Bar
+		MenuBar menuBar = createMenuBar();
+
+		// Main Layout
+		BorderPane mainLayout = new BorderPane();
+		mainLayout.setTop(menuBar);
+		mainLayout.setCenter(tabPane);
+		mainLayout.setBottom(controlPanel);
+
+		// Scene
+		Scene scene = new Scene(mainLayout, 800, 600);
+		//scene.getStylesheets().add(getClass().getResource("styles.css").toExternalForm());
+		primaryStage.setTitle(TITLE);
+		primaryStage.setScene(scene);
+		primaryStage.show();
+	}
+
 	private Processor initializeProcessor() {
-		List<ReservationStationGroup> reservationStations = new ArrayList<>();
-		reservationStations.add(new ReservationStationGroup(3, InstructionType.ADD_D));
-		reservationStations.add(new ReservationStationGroup(2, InstructionType.SUB_D));
-		reservationStations.add(new ReservationStationGroup(2, InstructionType.MUL_D));
-		reservationStations.add(new ReservationStationGroup(2, InstructionType.DIV_D));
-		reservationStations.add(new ReservationStationGroup(1, InstructionType.DADDI));
+		// Get user inputs
+		List<Instruction> instructions = UserInputDialogs.getUserInstructions();
+		List<ReservationStationGroup> reservationStations = UserInputDialogs.getUserReservationStations();
+		List<LoadStoreBufferGroup> loadStoreBuffers = UserInputDialogs.getUserLoadStoreBuffers();
+		Data data = UserInputDialogs.getUserCacheData();
 
-		// Create LoadStoreBuffers
-		List<LoadStoreBufferGroup> loadStoreBuffers = new ArrayList<>();
-		loadStoreBuffers.add(new LoadStoreBufferGroup(2, InstructionType.L_D));
-		loadStoreBuffers.add(new LoadStoreBufferGroup(2, InstructionType.S_D));
-
-		// Create Data
-		Data data = new Data(5, 2, 2, 10, 100);
 		// Create processor
 		Processor processor = new Processor(reservationStations, loadStoreBuffers, data);
 
 		// Add instructions to the processor
-		processor.addInstruction(new Instruction("L_D", "F0", "0", null));
-		processor.addInstruction(new Instruction("ADD_D", "F2", "F0", "F4"));
-		processor.addInstruction(new Instruction("SUB_D", "F6", "F2", "F8"));
-		processor.addInstruction(new Instruction("MUL_D", "F10", "F6", "F12"));
-		processor.addInstruction(new Instruction("DIV_D", "F14", "F10", "F16"));
-		processor.addInstruction(new Instruction("DADDI", "F14", "F1", "100"));
-		processor.addInstruction(new Instruction("S_D", "F14", "0", null));
+		for (Instruction instruction : instructions) {
+			processor.addInstruction(instruction);
+		}
 
 		// Provide Latency for each instruction
-		InstructionType.setLatency(InstructionType.ADD_D, 2);
-		InstructionType.setLatency(InstructionType.SUB_D, 2);
-		InstructionType.setLatency(InstructionType.MUL_D, 10);
-		InstructionType.setLatency(InstructionType.DIV_D, 40);
-		InstructionType.setLatency(InstructionType.DADDI, 1);
+		UserInputDialogs.setUserInstructionLatencies();
 
 		return processor;
 	}
 
-	@Override
-	public void start(Stage primaryStage) {
-		Processor processor = initializeProcessor();
-		processor.simulateAll();
-		cycleStates = processor.getCycleStates();
+	private VBox createTableView(String title) {
+		TableView tableView = new TableView();
+		Label label = new Label(title);
+		VBox vBox = new VBox(10, label, tableView);
+		vBox.setStyle("-fx-padding: 10; -fx-border-style: solid inside; -fx-border-width: 2; -fx-border-insets: 5; -fx-border-radius: 5; -fx-border-color: gray;");
+		return vBox;
+	}
 
-		ListView<String> listView = new ListView<>();
-		for (CycleState cycleState : cycleStates) {
-			listView.getItems().add("Cycle " + cycleState.cycle + ": \n" + cycleState.toString());
-		}
+	private HBox createControlPanel() {
+		Button startButton = new Button("Start");
+		startButton.setTooltip(new Tooltip("Start the simulation"));
+		Button nextCycleButton = new Button("Next Cycle");
+		nextCycleButton.setTooltip(new Tooltip("Proceed to the next cycle"));
+		Button resetButton = new Button("Reset");
+		resetButton.setTooltip(new Tooltip("Reset the simulation"));
+		HBox controlPanel = new HBox(10, startButton, nextCycleButton, resetButton);
+		controlPanel.setStyle("-fx-padding: 10; -fx-alignment: center;");
+		return controlPanel;
+	}
 
-		VBox vbox = new VBox(listView);
-		Scene scene = new Scene(vbox, 800, 600);
-		primaryStage.setScene(scene);
-		primaryStage.setTitle(TITLE);
-		primaryStage.show();
+	private MenuBar createMenuBar() {
+		MenuBar menuBar = new MenuBar();
+		Menu fileMenu = new Menu("File");
+		MenuItem loadItem = new MenuItem("Load Instructions");
+		MenuItem exitItem = new MenuItem("Exit");
+		exitItem.setOnAction(e -> System.exit(0));
+		fileMenu.getItems().addAll(loadItem, exitItem);
+
+		Menu editMenu = new Menu("Edit");
+		Menu helpMenu = new Menu("Help");
+
+		menuBar.getMenus().addAll(fileMenu, editMenu, helpMenu);
+		return menuBar;
 	}
 }

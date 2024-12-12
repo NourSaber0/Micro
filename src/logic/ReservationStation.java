@@ -6,6 +6,7 @@ public class ReservationStation {
 	InstructionType  operation;
 	String Vj, Vk; // Values of operands
 	String Qj, Qk; // Tags of operands if waiting
+
 	String resultValue;
 	int executionStartCycle = 0, executionEndCycle = 0;
 

@@ -38,6 +38,9 @@ public class Register {
 	public boolean getReady() {
 		return tag == null;
 	}
+	public void reset() {
+		tag = null;
+	}
 
 	public String toString() {
 		return name + " " + value + " " + tag;
