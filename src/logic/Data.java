@@ -1,9 +1,6 @@
 package logic;
 
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.Map;
-import java.util.Random;
+import java.util.*;
 
 public class Data {
 	private final Cache cache;
@@ -67,8 +64,28 @@ public class Data {
 		return memory.size;
 	}
 
+	public List<MemoryEntry> getMemoryEntries() {
+		List<MemoryEntry> entries = new ArrayList<>();
+		for (int i = 0; i < memory.size; i++) {
+			entries.add(new MemoryEntry(i, memory.data[i]));
+		}
+		return entries;
+	}
+
+	public List<CacheEntry> getCacheEntries() {
+		List<CacheEntry> entries = new ArrayList<>();
+		for (Map.Entry<Integer, Cache.CacheBlock> entry : cache.cacheBlockMap.entrySet()) {
+			entries.add(new CacheEntry(entry.getKey(), entry.getValue().cacheTag, entry.getValue().data));
+		}
+		return entries;
+	}
+
 	public String toString() {
 		return "Cache:\n" + cache + "\nMemory:\n" + memory;
+	}
+
+	public String[] getMemory() {
+		return memory.data;
 	}
 
 	private static class Cache {
@@ -185,6 +202,56 @@ public class Data {
 				sb.append("[").append(i).append("]: ").append(data[i]).append("\n");
 			}
 			return sb.toString();
+		}
+	}
+
+	public static class CacheEntry {
+		int index;
+		int tag;
+		String data;
+
+		public CacheEntry(int index, int tag, String data) {
+			this.index = index;
+			this.tag = tag;
+			this.data = data;
+		}
+
+		public int getIndex() {
+			return index;
+		}
+
+		public int getTag() {
+			return tag;
+		}
+
+		public String getData() {
+			return data;
+		}
+
+		public String toString() {
+			return index + ": " + tag + ", " + data;
+		}
+	}
+
+	public static class MemoryEntry {
+		int index;
+		String value;
+
+		public MemoryEntry(int index, String value) {
+			this.index = index;
+			this.value = value;
+		}
+
+		public int getIndex() {
+			return index;
+		}
+
+		public String getValue() {
+			return value;
+		}
+
+		public String toString() {
+			return index + ": " + value;
 		}
 	}
 }

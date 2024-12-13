@@ -16,6 +16,10 @@ public class LoadStoreBufferGroup {
 		return loadStoreBuffers[index];
 	}
 
+	public LoadStoreBuffer[] getBuffers() {
+		return loadStoreBuffers;
+	}
+
 	public String toString() {
 		StringBuilder sb = new StringBuilder();
 		sb.append(operation + ": \n");

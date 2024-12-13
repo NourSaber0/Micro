@@ -7,26 +7,27 @@ import static logic.InstructionType.getLatency;
 import static logic.InstructionType.isMemoryOperation;
 
 public class Processor {
-	private static boolean isBranchExecuting = false;
 	private final List<CycleState> cycleStates = new ArrayList<>();
 	private final List<Instruction> instructionQueue;
 	private final List<Instruction> instructions;
 	private final List<ReservationStationGroup> reservationStations;
 	private final List<LoadStoreBufferGroup> loadStoreBuffers;
 	private final LoadStoreBuffer branchBuffer = new LoadStoreBuffer("branch");
-	private final RegisterFile registerFile = new RegisterFile(32); // Example: 32 registers
+	private final RegisterFile registerFile; // Example: 32 registers
 	private final CommonDataBus cdb = new CommonDataBus();
 	private final Data data;
 	List<ReservationStation> readyStations = new ArrayList<>();
 	List<LoadStoreBuffer> readyBuffers = new ArrayList<>();
+	private boolean isBranchExecuting = false;
 	private int cycle = 0;
 
-	public Processor(List<ReservationStationGroup> reservationStations, List<LoadStoreBufferGroup> loadStoreBuffers, Data data, List<Instruction> instructions) {
+	public Processor(List<ReservationStationGroup> reservationStations, List<LoadStoreBufferGroup> loadStoreBuffers, Data data, List<Instruction> instructions, int RegisterFileSize) {
 		this.reservationStations = reservationStations;
 		this.loadStoreBuffers = loadStoreBuffers;
 		this.data = data;
 		this.instructionQueue = new ArrayList<>(instructions);
 		this.instructions = new ArrayList<>(instructions);
+		registerFile = new RegisterFile(RegisterFileSize);
 
 
 		cycleStates.add(getCurrentCycleState());
@@ -65,7 +66,7 @@ public class Processor {
 		instructions.add(new Instruction("S_D", "F14", "0", null));
 
 		// Create processor
-		Processor processor = new Processor(reservationStations, loadStoreBuffers, data, instructions);
+		Processor processor = new Processor(reservationStations, loadStoreBuffers, data, instructions, 32);
 
 		// Provide Latency for each instruction
 		InstructionType.setLatency(InstructionType.ADD_D, 2);
@@ -177,7 +178,7 @@ public class Processor {
 
 				Register src1 = registerFile.getRegister(Integer.parseInt(instruction.src1.substring(1)));
 				if (src1.getReady()) {
-					station.vj = src1.getValue();
+					station.vJ = src1.getValue();
 					station.qJ = "0";
 				} else {
 					station.qJ = src1.getTag();
@@ -227,7 +228,7 @@ public class Processor {
 				}
 
 				if (cdb.tag.equals(station.qJ)) {
-					station.vj = cdb.value;
+					station.vJ = cdb.value;
 					station.qJ = "0";
 				}
 				if (cdb.tag.equals(station.qK)) {
@@ -251,7 +252,6 @@ public class Processor {
 		}
 		for (LoadStoreBufferGroup group : loadStoreBuffers) {
 			for (LoadStoreBuffer buffer : group.loadStoreBuffers) {
-				//System.out.println(buffer);
 				if (!buffer.busy) {
 					continue;
 				}
@@ -272,13 +272,11 @@ public class Processor {
 					}
 					// for both
 					buffer.q = "0";
-					//System.out.println("Broadcasting result to buffer: " + buffer);
 				}
 
 				if (buffer.q.equals("0")) {
 					buffer.executionStartCycle = cycle + 1;
-					buffer.executionEndCycle = cycle + data.getLatency(Integer.parseInt(buffer.address));
-					//System.out.println("Execution start cycle: " + buffer.executionStartCycle);
+					buffer.executionEndCycle = cycle + getLatency(buffer.operation) + data.getLatency(Integer.parseInt(buffer.address));
 				}
 			}
 		}
@@ -339,19 +337,19 @@ public class Processor {
 					if (station.executionEndCycle == cycle) {
 						switch (InstructionType.valueOf(station.operation.toString())) {
 							case ADD_D, ADD_S:
-								station.resultValue = String.valueOf(Double.parseDouble(station.vj) + Double.parseDouble(station.vK));
+								station.resultValue = String.valueOf(Double.parseDouble(station.vJ) + Double.parseDouble(station.vK));
 								break;
 							case SUB_D, SUB_S, DSUBI:
-								station.resultValue = String.valueOf(Double.parseDouble(station.vj) - Double.parseDouble(station.vK));
+								station.resultValue = String.valueOf(Double.parseDouble(station.vJ) - Double.parseDouble(station.vK));
 								break;
 							case MUL_D, MUL_S:
-								station.resultValue = String.valueOf(Double.parseDouble(station.vj) * Double.parseDouble(station.vK));
+								station.resultValue = String.valueOf(Double.parseDouble(station.vJ) * Double.parseDouble(station.vK));
 								break;
 							case DIV_D, DIV_S:
-								station.resultValue = String.valueOf(Double.parseDouble(station.vj) / Double.parseDouble(station.vK));
+								station.resultValue = String.valueOf(Double.parseDouble(station.vJ) / Double.parseDouble(station.vK));
 								break;
 							case DADDI:
-								station.resultValue = String.valueOf(Double.parseDouble(station.vj) + Double.parseDouble(station.vK));
+								station.resultValue = String.valueOf(Double.parseDouble(station.vJ) + Double.parseDouble(station.vK));
 								break;
 
 							default:
@@ -369,7 +367,7 @@ public class Processor {
 					System.out.println("Buffer: " + buffer);
 					if (buffer.executionStartCycle == 0) {
 						buffer.executionStartCycle = cycle + 1;
-						buffer.executionEndCycle = cycle + data.getLatency(Integer.parseInt(buffer.address));
+						buffer.executionEndCycle = cycle + getLatency(buffer.getOperation()) + data.getLatency(Integer.parseInt(buffer.address));
 						continue;
 					}
 					if (buffer.executionStartCycle <= cycle && buffer.executionEndCycle > cycle) {
@@ -391,17 +389,6 @@ public class Processor {
 				}
 			}
 		}
-	}
-
-	private ReservationStation findStationByTag(String tag) {
-		for (ReservationStationGroup group : reservationStations) {
-			for (ReservationStation station : group.stations) {
-				if (station.tag.equals(tag)) {
-					return station;
-				}
-			}
-		}
-		return null;
 	}
 
 	private int countDependencies(ReservationStation station) {
@@ -478,7 +465,6 @@ public class Processor {
 			for (ReservationStation station : group.stations) {
 				if (station.executionEndCycle == cycle - 1 && station.busy) {
 					readyStations.add(station); // Add ready station
-					//System.out.println("Ready station: " + station);
 				}
 			}
 		}
@@ -533,7 +519,6 @@ public class Processor {
 
 				prioritizedBuffer.reset();
 			} else if (prioritizedStation != null) {
-				//System.out.println("Prioritized station: " + prioritizedStation);
 				readyStations.remove(prioritizedStation);
 				cdb.tag = prioritizedStation.tag;
 				cdb.value = prioritizedStation.resultValue;
@@ -660,7 +645,7 @@ public class Processor {
 				ReservationStation stationCopy = new ReservationStation(station.tag);
 				stationCopy.busy = station.busy;
 				stationCopy.operation = station.operation;
-				stationCopy.vj = station.vj;
+				stationCopy.vJ = station.vJ;
 				stationCopy.vK = station.vK;
 				stationCopy.qJ = station.qJ;
 				stationCopy.qK = station.qK;

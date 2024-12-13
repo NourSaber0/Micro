@@ -27,6 +27,10 @@ public class RegisterFile {
 		}
 	}
 
+	public Register[] getRegisters() {
+		return registers;
+	}
+
 	public String toString() {
 		StringBuilder sb = new StringBuilder();
 		for (Register r : registers) {

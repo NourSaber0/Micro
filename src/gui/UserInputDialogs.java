@@ -149,4 +149,24 @@ public class UserInputDialogs {
 			}
 		});
 	}
+
+	public static int getUserRegisterFileSize() {
+		TextInputDialog dialog = new TextInputDialog();
+		TextArea textArea = new TextArea();
+		dialog.setTitle("Register File Size");
+		dialog.setHeaderText("Enter the number of registers in the register file");
+		dialog.setContentText("Register File Size:");
+		dialog.getDialogPane().setContent(textArea);
+
+		if (TESTING)
+			textArea.setText("32");
+
+		Optional<String> result = dialog.showAndWait().map(dialogButton -> textArea.getText());
+		if (result.isPresent()) {
+			String input = result.get();
+			return Integer.parseInt(input.trim());
+		}
+
+		return 0;
+	}
 }
