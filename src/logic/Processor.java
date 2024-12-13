@@ -209,7 +209,7 @@ public class Processor {
 			branchBuffer.qK = "0";
 			branchBuffer.vK = cdb.value;
 		}
-		if (branchBuffer.qJ.equals("0") && branchBuffer.qK.equals("0")) {
+		if (branchBuffer.isBusy() && branchBuffer.qJ.equals("0") && branchBuffer.qK.equals("0")) {
 			branchBuffer.executionStartCycle = cycle + 1;
 		}
 		for (ReservationStationGroup group : reservationStations) {
@@ -309,7 +309,7 @@ public class Processor {
 					// put instructions from array to queue
 					instructionQueue.clear();
 					// put in instruction queue from instruction starting from branchBuffer.address
-					for (int i = Integer.parseInt(branchBuffer.resultValue) -1; i < instructions.size(); i++) {
+					for (int i = Integer.parseInt(branchBuffer.resultValue) - 1; i < instructions.size(); i++) {
 						instructionQueue.add(instructions.get(i));
 					}
 				}
@@ -624,7 +624,7 @@ public class Processor {
 	}
 
 	public void simulateAll() {
-		while (!isSimulationComplete() ) {
+		while (!isSimulationComplete()) {
 			simulate();
 		}
 	}

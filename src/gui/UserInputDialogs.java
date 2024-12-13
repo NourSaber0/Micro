@@ -25,7 +25,7 @@ public class UserInputDialogs {
 		dialog.getDialogPane().setContent(textArea);
 
 		if (TESTING)
-			textArea.setText("L_D F0 0 null\nADD_D F2 F0 F4\nSUB_D F6 F2 F2\nDADDI F6 F6 1\nDSUBI F4 F6 2\nBNE F4 3 null\nS_D F2 4 null\nMUL_D F10 F6 F12\nDIV_D F14 F10 F16\nDADDI F14 F1 100\nS_D F14 0 null");
+			textArea.setText("L_D F0 0 null\nADD_D F2 F0 F4\nSUB_D F5 F2 F2\nSUB_D F6 F2 F2\nDADDI F6 F6 1\nDSUBI F4 F6 2\nBNE F4 F5 3\nS_D F2 4 null\nMUL_D F10 F6 F12\nDIV_D F14 F10 F16\nDADDI F14 F1 100\nS_D F14 0 null");
 
 		Optional<String> result = dialog.showAndWait().map(dialogButton -> textArea.getText());
 		result.ifPresent(input -> {
@@ -106,7 +106,7 @@ public class UserInputDialogs {
 		dialog.getDialogPane().setContent(textArea);
 
 		if (TESTING)
-			textArea.setText("5 2 2 10 100");
+			textArea.setText("10 2 2 10 100");
 
 		Optional<String> result = dialog.showAndWait().map(dialogButton -> textArea.getText());
 		if (result.isPresent()) {

@@ -23,22 +23,26 @@ public class Data {
 	}
 
 	public int getLatency(int address) {
+		address -= address % 4;
 		return cache.isInCache(address) ? cache.hitLatency : cache.missPenalty;
 	}
 
 	public String read(int address) {
+		// reduce address to block index
+		address -= address % 4;
+
 		if (cache.isInCache(address)) {
 			return cache.getData(address);
 		} else {
 			String data = memory.read(address);
-			if (!cache.isCacheFull()) {
-				cache.writeData(address, data);
-			}
+			cache.writeData(address, data);
 			return data;
 		}
 	}
 
 	public void write(int address, String data) {
+		address -= address % 4;
+
 		memory.write(address, data);
 		if (!cache.isInCache(address)) {
 			if (!cache.isCacheFull()) {
@@ -67,7 +71,7 @@ public class Data {
 	public List<MemoryEntry> getMemoryEntries() {
 		List<MemoryEntry> entries = new ArrayList<>();
 		for (int i = 0; i < memory.size; i++) {
-			entries.add(new MemoryEntry(i, memory.data[i]));
+			entries.add(new MemoryEntry(i * 4, memory.data[i]));
 		}
 		return entries;
 	}
@@ -75,7 +79,7 @@ public class Data {
 	public List<CacheEntry> getCacheEntries() {
 		List<CacheEntry> entries = new ArrayList<>();
 		for (Map.Entry<Integer, Cache.CacheBlock> entry : cache.cacheBlockMap.entrySet()) {
-			entries.add(new CacheEntry(entry.getKey(), entry.getValue().cacheTag, entry.getValue().data));
+			entries.add(new CacheEntry(entry.getKey() * 4, entry.getValue().cacheTag, entry.getValue().data));
 		}
 		return entries;
 	}
