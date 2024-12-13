@@ -21,13 +21,13 @@ public class Processor {
 	private boolean isBranchExecuting = false;
 	private int cycle = 0;
 
-	public Processor(List<ReservationStationGroup> reservationStations, List<LoadStoreBufferGroup> loadStoreBuffers, Data data, List<Instruction> instructions, int RegisterFileSize) {
+	public Processor(List<ReservationStationGroup> reservationStations, List<LoadStoreBufferGroup> loadStoreBuffers, Data data, List<Instruction> instructions, int registerFileSize) {
 		this.reservationStations = reservationStations;
 		this.loadStoreBuffers = loadStoreBuffers;
 		this.data = data;
 		this.instructionQueue = new ArrayList<>(instructions);
 		this.instructions = new ArrayList<>(instructions);
-		registerFile = new RegisterFile(RegisterFileSize);
+		registerFile = new RegisterFile(registerFileSize);
 
 
 		cycleStates.add(getCurrentCycleState());
@@ -298,13 +298,14 @@ public class Processor {
 
 	private void executeStage() {
 		// at end of execution update destination register (ASK ALY)
+		System.out.println("Branch buffer: " + branchBuffer);
 		if (branchBuffer.busy && branchBuffer.q.equals("0")) {
 			if (branchBuffer.operation == InstructionType.BNE) {
 				if (Double.parseDouble(branchBuffer.value) != 0) {
 					// put instructions from array to queue
 					instructionQueue.clear();
 					// put in instruction queue from instruction starting from branchBuffer.address
-					for (int i = Integer.parseInt(branchBuffer.address); i < instructions.size(); i++) {
+					for (int i = Integer.parseInt(branchBuffer.address) - 1; i < instructions.size(); i++) {
 						instructionQueue.add(instructions.get(i));
 					}
 				}
@@ -608,7 +609,8 @@ public class Processor {
 			}
 		}
 
-		return true;
+		// Check if a branch is executing
+		return !isBranchExecuting;
 	}
 
 	public void simulate() {
