@@ -6,8 +6,11 @@ public class RegisterFile {
 	public RegisterFile(int size) {
 		registers = new Register[size];
 		for (int i = 0; i < size; i++) {
-			registers[i] = new Register("F" + i);
+			registers[i] = new Register("F" + i,String.valueOf((int) (Math.random() * 10000000) / 1000.0));
 		}
+	}
+	public int getSize() {
+		return registers.length;
 	}
 
 	public RegisterFile(RegisterFile registerFile) {

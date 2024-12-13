@@ -3,8 +3,7 @@ package logic;
 import java.util.ArrayList;
 import java.util.List;
 
-import static logic.InstructionType.getLatency;
-import static logic.InstructionType.isMemoryOperation;
+import static logic.InstructionType.*;
 
 public class Processor {
 	private final List<CycleState> cycleStates = new ArrayList<>();
@@ -38,18 +37,22 @@ public class Processor {
 		List<ReservationStationGroup> reservationStations = new ArrayList<>();
 		reservationStations.add(new ReservationStationGroup(3, InstructionType.SUB_D));
 		reservationStations.add(new ReservationStationGroup(3, InstructionType.ADD_D));
-		reservationStations.add(new ReservationStationGroup(2, InstructionType.DADDI));
-		reservationStations.add(new ReservationStationGroup(2, InstructionType.DSUBI));
+		reservationStations.add(new ReservationStationGroup(3, InstructionType.MUL_D));
+		reservationStations.add(new ReservationStationGroup(3, InstructionType.DIV_D));
+		reservationStations.add(new ReservationStationGroup(3, InstructionType.DADDI));
+		reservationStations.add(new ReservationStationGroup(3, InstructionType.DSUBI));
 
 		List<LoadStoreBufferGroup> loadStoreBuffers = new ArrayList<>();
+		loadStoreBuffers.add(new LoadStoreBufferGroup(3, InstructionType.L_D));
+		loadStoreBuffers.add(new LoadStoreBufferGroup(3, InstructionType.S_D));
 
 		Data data = new Data(5, 2, 2, 10, 100);
 
 		ArrayList<Instruction> instructions = new ArrayList<>();
-		instructions.add(new Instruction("SUB_D", "F0", "F0", "F0"));
-		instructions.add(new Instruction("DADDI", "F0", "F0", "5"));
-		instructions.add(new Instruction("DSUBI", "F0", "F0", "1"));
-		instructions.add(new Instruction("BNE", "F0", "3", null));
+		instructions.add(new Instruction("SUB_D", "F1", "F1", "F1"));
+		instructions.add(new Instruction("DADDI", "F2", "F1", "5"));
+		instructions.add(new Instruction("DSUBI", "F2", "F2", "1"));
+		instructions.add(new Instruction("BNE", "F1", "F2", "3"));
 
 // Create processor
 		Processor processor = new Processor(reservationStations, loadStoreBuffers, data, instructions, 32);
@@ -57,6 +60,11 @@ public class Processor {
 // Set latencies
 		InstructionType.setLatency(InstructionType.DADDI, 1);
 		InstructionType.setLatency(InstructionType.DSUBI, 1);
+		InstructionType.setLatency(InstructionType.ADD_D, 2);
+		InstructionType.setLatency(InstructionType.SUB_D, 2);
+		InstructionType.setLatency(InstructionType.MUL_D, 10);
+		InstructionType.setLatency(InstructionType.DIV_D, 10);
+
 
 		processor.simulateAll();
 		System.out.println(data);
@@ -150,7 +158,7 @@ public class Processor {
 				} else {
 					buffer.q = dest.getTag();
 				}
-				if (instruction.operation == InstructionType.L_D) {
+				if (instruction.operation == InstructionType.L_D || instruction.operation == InstructionType.L_S || instruction.operation == InstructionType.LW || instruction.operation == InstructionType.LD)  {
 					dest.setTag(buffer.tag);
 				}
 			} else {
@@ -163,31 +171,28 @@ public class Processor {
 				station.busy = true;
 				station.operation = instruction.operation;
 				// Fetch and validate source registers
-
-				Register src1 = registerFile.getRegister(Integer.parseInt(instruction.src1.substring(1)));
-				if (src1.getReady()) {
-					station.vJ = src1.getValue();
-					station.qJ = "0";
-				} else {
-					station.qJ = src1.getTag();
-				}
-				Register src2;
-				if (instruction.operation != InstructionType.DADDI && instruction.operation != InstructionType.DSUBI) {
-					src2 = registerFile.getRegister(Integer.parseInt(instruction.src2.substring(1)));
-					if (src2.getReady()) {
-						station.vK = src2.getValue();
-						station.qK = "0";
+					Register src1 = registerFile.getRegister(Integer.parseInt(instruction.src1.substring(1)));
+					if (src1.getReady()) {
+						station.vJ = src1.getValue();
+						station.qJ = "0";
 					} else {
-						station.qK = src2.getTag();
+						station.qJ = src1.getTag();
 					}
-				} else {
-					station.vK = instruction.src2;
-					station.qK = "0";
-				}
-
-				// Update destination register
-				Register dest = registerFile.getRegister(Integer.parseInt(instruction.dest.substring(1)));
-				dest.setTag(station.tag);
+					Register src2;
+					if (instruction.operation != InstructionType.DADDI && instruction.operation != InstructionType.DSUBI) {
+						src2 = registerFile.getRegister(Integer.parseInt(instruction.src2.substring(1)));
+						if (src2.getReady()) {
+							station.vK = src2.getValue();
+							station.qK = "0";
+						} else {
+							station.qK = src2.getTag();
+						}
+					} else {
+						station.vK = instruction.src2;
+						station.qK = "0";
+					}
+					Register dest = registerFile.getRegister(Integer.parseInt(instruction.dest.substring(1)));
+					dest.setTag(station.tag);
 			}
 
 			// Remove instruction from the queue
@@ -371,10 +376,10 @@ public class Processor {
 					}
 					if (buffer.executionEndCycle == cycle) {
 						switch (InstructionType.valueOf(buffer.operation.toString())) {
-							case L_D, L_S, LW:
+							case L_D, L_S, LW, LD:
 								buffer.value = data.read(Integer.parseInt(buffer.address));
 								break;
-							case S_D, S_S, SW:
+							case S_D, S_S, SW, SD:
 								data.write(Integer.parseInt(buffer.address), buffer.value);
 								break;
 							default:
@@ -411,7 +416,7 @@ public class Processor {
 		}
 
 		// Check registers
-		for (int i = 0; i < 32; i++) {
+		for (int i = 0; i < registerFile.getSize(); i++) {
 			Register reg = registerFile.getRegister(i);
 			if (reg.getTag() != null && reg.getTag().equals(station.tag)) {
 				dependencies++;
@@ -445,7 +450,7 @@ public class Processor {
 		}
 
 		// Check registers
-		for (int i = 0; i < 32; i++) {
+		for (int i = 0; i <registerFile.getSize(); i++) {
 			Register reg = registerFile.getRegister(i);
 			if (reg.getTag() != null && reg.getTag().equals(buffer.tag)) {
 				dependencies++;
@@ -469,9 +474,12 @@ public class Processor {
 		for (LoadStoreBufferGroup group : loadStoreBuffers) {
 			for (LoadStoreBuffer buffer : group.loadStoreBuffers) {
 				if (buffer.executionEndCycle == cycle - 1 && buffer.busy) {
-					if (buffer.operation == InstructionType.L_D) {
+					if (buffer.operation == InstructionType.L_D || buffer.operation == InstructionType.L_S || buffer.operation == InstructionType.LW || buffer.operation == InstructionType.LD) {
 						readyBuffers.add(buffer); // Add ready station
-					} else {
+					}
+				}
+				if (buffer.executionEndCycle == cycle  && buffer.busy) {
+					if (buffer.operation == InstructionType.S_D || buffer.operation == InstructionType.S_S || buffer.operation == InstructionType.SW || buffer.operation == InstructionType.SD) {
 						buffer.reset();
 					}
 				}

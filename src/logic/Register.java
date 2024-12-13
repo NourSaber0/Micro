@@ -5,11 +5,7 @@ public class Register {
 	String value;
 	String tag;
 
-	public Register(String name) {
-		this.name = name;
-		//place random value
-		this.value = String.valueOf((int) (Math.random() * 10000000) / 1000.0);
-	}
+
 
 	public Register(String name, String value) {
 		this.name = name;
